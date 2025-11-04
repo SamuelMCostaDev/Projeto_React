@@ -5,6 +5,7 @@ Projeto React de ponta a ponta (projeto pessoal)
 # React + TypeScript + Vite
 
 Sistema bancário completo feito em React e Vite. 
+Utilização de Express, JWT, e CORS.
 
 A persistência dos dados foi feita com SQLite e Prisma.
 
