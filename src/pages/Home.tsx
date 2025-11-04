@@ -19,7 +19,7 @@ export default function Home() {
         </a>
       </header>
 
-      <h1>Vite + React + TS</h1>
+      <h1>Sistema Bancário React</h1>
 
       <section className="card" style={{ display: "grid", gap: 12 }}>
         <Counter />

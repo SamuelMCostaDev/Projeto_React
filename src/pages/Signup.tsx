@@ -1,6 +1,8 @@
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useNavigate } from "react-router-dom";
+import { api } from "../lib/api";
 
 const schema = z
   .object({
@@ -28,9 +30,26 @@ export default function Signup() {
     defaultValues: { terms: false },
   });
 
+  const navigate = useNavigate();
+
   const onSubmit = async (data: FormData) => {
-    await new Promise((r) => setTimeout(r, 600)); // simula request
-    alert(`OK!\n${JSON.stringify(data, null, 2)}`);
+    try {
+      const payload = { name: data.name, email: data.email, password: data.password };
+      await api("/auth/signup", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      alert("Conta criada com sucesso! Faça login para entrar.");
+      navigate("/login", { replace: true });
+    } catch (e) {
+      const msg = (e as Error).message || "Erro ao cadastrar.";
+      if (msg.includes("email já usado") || msg.includes("409")) {
+        alert("Este e-mail já possui conta. Faça login.");
+        navigate("/login");
+      } else {
+        alert(msg);
+      }
+    }
   };
 
   return (
@@ -63,7 +82,6 @@ export default function Signup() {
             {errors.confirm && <small className="error">{errors.confirm.message}</small>}
           </label>
 
-          {/* Checkbox alinhada à esquerda */}
           <label className="checkbox-row">
             <input type="checkbox" {...register("terms")} />
             <span>Aceito os termos</span>

@@ -1,9 +1,15 @@
 // src/layout/Layout.tsx
 import { NavLink, Outlet } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 
 export default function Layout() {
   const { theme, toggle } = useTheme();
+  const { user, logout } = useAuth();
+
+  const linkStyle = ({ isActive }: { isActive: boolean }) => ({
+    color: isActive ? "#646cff" : "inherit",
+  });
 
   return (
     <div style={{ padding: 24 }}>
@@ -17,26 +23,27 @@ export default function Layout() {
         }}
       >
         <div style={{ display: "flex", gap: 12 }}>
-          <NavLink
-            to="/"
-            style={({ isActive }) => ({ color: isActive ? "#646cff" : "inherit" })}
-          >
-            Home
-          </NavLink>
-          <NavLink
-            to="/users"
-            style={({ isActive }) => ({ color: isActive ? "#646cff" : "inherit" })}
-          >
-            Users
-          </NavLink>
-          <NavLink to="/signup" style={({isActive}) => ({ color: isActive ? "#646cff" : "inherit" })}>
-          Sign up
-        </NavLink>
+          <NavLink to="/" style={linkStyle}>Home</NavLink>
+          <NavLink to="/users" style={linkStyle}>Users</NavLink>
+          <NavLink to="/signup" style={linkStyle}>Sign up</NavLink>
+
+          {user ? (
+            <NavLink to="/dashboard" style={linkStyle}>Dashboard</NavLink>
+          ) : (
+            <NavLink to="/login" style={linkStyle}>Login</NavLink>
+          )}
         </div>
 
-        <button onClick={toggle} title="Alternar tema">
-          Tema: {theme}
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {user && (
+            <button onClick={logout} title="Sair">
+              Sair
+            </button>
+          )}
+          <button onClick={toggle} title="Alternar tema">
+            Tema: {theme}
+          </button>
+        </div>
       </nav>
 
       <Outlet />

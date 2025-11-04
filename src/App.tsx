@@ -9,6 +9,10 @@ import Users from "./pages/Users";
 import NotFound from "./pages/NotFound";
 import UserDetail from "./pages/UserDetail";
 import Signup from "./pages/Signup";
+import Protected from "./components/Protected";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const router = createBrowserRouter([
   { element: <Layout />, children: [
@@ -17,6 +21,11 @@ const router = createBrowserRouter([
       { path: "/users/:id", element: <UserDetail /> },
       { path: "*", element: <NotFound /> }, // <- 404
       { path: "/signup", element: <Signup /> },
+      { path: "/login", element: <Login/>},
+      {
+        element: <ProtectedRoute />,   // tudo abaixo exige login
+        children: [{ path: "/dashboard", element: <Dashboard /> }],
+      },
   ]},
 ]);
 
