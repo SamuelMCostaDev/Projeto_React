@@ -1,4 +1,4 @@
-// server/src/types/express.d.ts
+
 
 // Augmenta o tipo global do Express (forma mais à prova de falhas)
 declare global {
@@ -9,4 +9,4 @@ declare global {
   }
 }
 
-export {}; // mantém como módulo
+export {}; 

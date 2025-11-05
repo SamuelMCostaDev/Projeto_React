@@ -7,10 +7,6 @@ export default function Layout() {
   const { theme, toggle } = useTheme();
   const { user, logout } = useAuth();
 
-  const linkStyle = ({ isActive }: { isActive: boolean }) => ({
-    color: isActive ? "#646cff" : "inherit",
-  });
-
   return (
     <div style={{ padding: 24 }}>
       <nav
@@ -23,27 +19,62 @@ export default function Layout() {
         }}
       >
         <div style={{ display: "flex", gap: 12 }}>
-          <NavLink to="/" style={linkStyle}>Home</NavLink>
-          <NavLink to="/users" style={linkStyle}>Users</NavLink>
-          <NavLink to="/signup" style={linkStyle}>Sign up</NavLink>
+          <NavLink
+            to="/"
+            style={({ isActive }) => ({ color: isActive ? "#646cff" : "inherit" })}
+          >
+            Home
+          </NavLink>
 
-          {user ? (
-            <NavLink to="/dashboard" style={linkStyle}>Dashboard</NavLink>
-          ) : (
-            <NavLink to="/login" style={linkStyle}>Login</NavLink>
-          )}
-        </div>
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {/* aparece só quando logado e com o novo rótulo */}
           {user && (
-            <button onClick={logout} title="Sair">
+            <NavLink
+              to="/users"
+              style={({ isActive }) => ({ color: isActive ? "#646cff" : "inherit" })}
+            >
+              Histórico de Transações
+            </NavLink>
+          )}
+
+          {/* públicos quando NÃO logado */}
+          {!user && (
+            <>
+              <NavLink
+                to="/signup"
+                style={({ isActive }) => ({ color: isActive ? "#646cff" : "inherit" })}
+              >
+                Sign up
+              </NavLink>
+              <NavLink
+                to="/login"
+                style={({ isActive }) => ({ color: isActive ? "#646cff" : "inherit" })}
+              >
+                Login
+              </NavLink>
+            </>
+          )}
+
+          {/* opcional: botão sair quando logado */}
+          {user && (
+            <button
+              onClick={logout}
+              style={{
+                background: "transparent",
+                border: "1px solid #e5e7eb",
+                borderRadius: 8,
+                padding: "4px 10px",
+                cursor: "pointer",
+              }}
+              title="Sair"
+            >
               Sair
             </button>
           )}
-          <button onClick={toggle} title="Alternar tema">
-            Tema: {theme}
-          </button>
         </div>
+
+        <button onClick={toggle} title="Alternar tema">
+          Tema: {theme}
+        </button>
       </nav>
 
       <Outlet />

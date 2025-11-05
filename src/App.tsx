@@ -17,14 +17,16 @@ import ProtectedRoute from "./components/ProtectedRoute";
 const router = createBrowserRouter([
   { element: <Layout />, children: [
       { path: "/", element: <Home /> },
-      { path: "/users", element: <Users /> },
-      { path: "/users/:id", element: <UserDetail /> },
-      { path: "*", element: <NotFound /> }, // <- 404
+      { path: "*", element: <NotFound /> }, 
       { path: "/signup", element: <Signup /> },
       { path: "/login", element: <Login/>},
       {
-        element: <ProtectedRoute />,   // tudo abaixo exige login
-        children: [{ path: "/dashboard", element: <Dashboard /> }],
+        element: <ProtectedRoute />, 
+        children: [
+          { path: "/dashboard", element: <Dashboard /> },
+          { path: "/users", element: <Users /> },
+          { path: "/users/:id", element: <UserDetail /> },
+        ],
       },
   ]},
 ]);

@@ -18,6 +18,6 @@ export function useLocalStorage<T>(key: string, initial: T) {
     }
   }, [key, value]);
 
-  // 👇 ISSO É O MAIS IMPORTANTE: retornar a TUPLA
+ 
   return [value, setValue] as const;
 }

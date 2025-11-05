@@ -19,7 +19,24 @@ const { PORT = 4000, JWT_SECRET = "secret", CORS_ORIGIN } = process.env as {
 };
 
 /* ----------------------- CORS ----------------------- */
-const allowedOrigins = CORS_ORIGIN?.split(",").map(s => s.trim()).filter(Boolean) ?? ["http://localhost:5173"];
+const allowedOrigins = CORS_ORIGIN?.split(",").map(s => s.trim()).filter(Boolean)
+  ?? ["http://localhost:5173", "http://127.0.0.1:5173"];
+
+const baseCors = cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // Postman/cURL
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    console.log(`❌ CORS bloqueado para origem: ${origin}`);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true, // mantenha como já está
+});
+
+app.use(baseCors);
+
+
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -38,15 +55,13 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
-// REMOVA COMPLETAMENTE estas linhas problemáticas:
-// app.options("*", cors({ origin: true, credentials: true }));
-// app.options("*", cors());
-/* ---------------------------------------------------- */
-/* ---------------------------------------------------- */
+
 
 app.use(express.json());
 
-// healthcheck (útil pra testar se o server está de pé)
+
+
+
 app.get("/health", (_req, res) => res.status(200).send("ok"));
 
 function signToken(userId: number) {
@@ -68,7 +83,7 @@ function auth(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-/** Auth */
+
 app.post("/auth/signup", async (req: Request, res: Response) => {
   const { name, email, password } = req.body ?? {};
   if (!name || !email || !password) return res.status(400).json({ error: "dados inválidos" });
@@ -97,7 +112,7 @@ app.post("/auth/login", async (req: Request, res: Response) => {
   });
 });
 
-/** Me */
+
 app.get("/me", auth, async (req: Request, res: Response) => {
   const user = await prisma.user.findUnique({
     where: { id: req.userId! },
@@ -109,7 +124,7 @@ app.get("/me", auth, async (req: Request, res: Response) => {
   });
 });
 
-/** Saldo */
+
 app.get("/accounts/:id", auth, async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const acc = await prisma.account.findUnique({ where: { id } });
@@ -117,7 +132,7 @@ app.get("/accounts/:id", auth, async (req: Request, res: Response) => {
   res.json(acc);
 });
 
-/** Extrato */
+
 app.get("/transactions", auth, async (req: Request, res: Response) => {
   const accountId = Number((req.query.accountId as string) ?? 0);
   const txs = await prisma.transaction.findMany({
@@ -128,7 +143,31 @@ app.get("/transactions", auth, async (req: Request, res: Response) => {
   res.json(txs);
 });
 
-/** Transferência */
+
+app.get("/users", auth, async (_req, res) => {
+  const users = await prisma.user.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { account: true },
+  });
+
+  
+  const withTx = await Promise.all(
+    users.map(async (u) => {
+      if (!u.account) return { ...u, recentTx: [] as any[] };
+      const recentTx = await prisma.transaction.findMany({
+        where: { OR: [{ fromId: u.account.id }, { toId: u.account.id }] },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      });
+      return { ...u, recentTx };
+    })
+  );
+
+  res.json(withTx);
+});
+
+
+
 app.post("/transfer", auth, async (req: Request, res: Response) => {
   const { fromId, toId, amount } = req.body ?? {};
   const value = Number(amount || 0);

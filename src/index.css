@@ -184,7 +184,7 @@ input:focus, select:focus, textarea:focus {
   font-size: clamp(28px, 5vw, 48px);
   line-height: 1.1;
   margin: 10px 0 18px;
-  text-align: left;
+  text-align: center;
 }
 
 /* Botão do tema no topo (estilo mais neutro) */
@@ -219,7 +219,7 @@ nav button {
   margin-inline: auto;   /* centraliza dentro do card */
 }
 
-/* Em telas pequenas, deixa 100% mesmo */
+
 @media (max-width: 300px) {
   .form--narrow { max-width: 100%; }
 }

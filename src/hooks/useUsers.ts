@@ -1,14 +1,13 @@
-// src/hooks/useUsers.ts
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export type User = { id: number; name: string; email: string };
 
 type Options = {
-  /** desliga o fetch inicial se false (padrão: true) */
+  
   enabled?: boolean;
-  /** número de tentativas extras em caso de erro (padrão: 0 = sem retry) */
+
   retry?: number;
-  /** url custom, se quiser trocar a fonte (padrão: jsonplaceholder) */
+  
   url?: string;
 };
 
@@ -20,17 +19,17 @@ export function useUsers(opts?: Options) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // gatilho para "refetch"
+  
   const [tick, setTick] = useState(0);
   const refetch = () => setTick((x) => x + 1);
 
-  // guarda a última URL para evitar re-renders desnecessários
+ 
   const stableUrl = useMemo(() => url, [url]);
   const retryRef = useRef(retry);
 
   useEffect(() => {
     if (!enabled) {
-      // se estiver desabilitado, zera loading e sai
+    
       setLoading(false);
       return;
     }
@@ -53,9 +52,9 @@ export function useUsers(opts?: Options) {
           if (!alive) return;
           setUsers(data);
           setLoading(false);
-          return; // sucesso → sai
+          return; 
         } catch (err: any) {
-          if (ctrl.signal.aborted) return; // cancelado → só sai
+          if (ctrl.signal.aborted) return; 
           attempt++;
           if (attempt >= max) {
             if (!alive) return;
@@ -79,6 +78,6 @@ export function useUsers(opts?: Options) {
   const status: "idle" | "loading" | "error" | "success" =
     !enabled ? "idle" : loading ? "loading" : error ? "error" : "success";
 
-  // mantém compat: users, loading, error. Extras: refetch, status
+ 
   return { users, loading, error, refetch, status };
 }

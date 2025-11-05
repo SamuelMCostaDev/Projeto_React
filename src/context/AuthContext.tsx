@@ -7,7 +7,7 @@ type Auth = {
   accountId: number | null; 
   login(e: string, p: string): Promise<void>; 
   logout(): void; 
-  loading: boolean; // Adicionei loading state
+  loading: boolean; 
 };
 
 const Ctx = createContext<Auth>(null!);
@@ -15,7 +15,7 @@ const Ctx = createContext<Auth>(null!);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accountId, setAccountId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true); // Loading state
+  const [loading, setLoading] = useState(true); 
 
   useEffect(() => {
     const token = getToken();
@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Carrega os dados do usuário
+   
     async function loadUser() {
       try {
         const data = await api("/me");
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAccountId(data.account?.id ?? null);
       } catch (error) {
         console.error("Erro ao carregar usuário:", error);
-        setToken(null); // Remove token inválido
+        setToken(null); 
       } finally {
         setLoading(false);
       }
@@ -43,10 +43,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function login(email: string, password: string) {
     try {
-      // CORREÇÃO: Use 'json' em vez de 'body'
+      
       const res = await api("/auth/login", { 
         method: "POST", 
-        json: { email, password } // ← MUDEI PARA 'json'
+        json: { email, password } 
       });
       
       setToken(res.token);
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAccountId(res.accountId);
     } catch (error: any) {
       console.error("Erro no login:", error);
-      throw error; // Re-lança o erro para o componente capturar
+      throw error; 
     }
   }
 
