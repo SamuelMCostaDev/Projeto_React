@@ -38,7 +38,7 @@ export default function Users() {
     (async () => {
       try {
         setError(null);
-        const res: UserRow[] = await api("/users"); // GET http://localhost:4000/users
+        const res: UserRow[] = await api("/users-with-transactions"); // GET http://localhost:4000/users
         setData(res);
       } catch (e: any) {
         setError(e?.message || "NETWORK_ERROR");

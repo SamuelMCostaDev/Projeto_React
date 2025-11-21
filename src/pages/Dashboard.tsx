@@ -7,6 +7,15 @@ type Account = { id:number; balance:number };
 type Tx = { id:number; fromId:number|null; toId:number|null; amount:number; createdAt:string };
 type UserWithAccount = { id:number; name:string; email:string; account: { id:number } | null };
 type AutoDebitConfig = { id: number; accountId: number; active: boolean };
+type Toast = {
+  type: "success" | "error";
+  title: string;
+  message: string;
+};
+
+const MIN_TRANSFER_TIME_MS = 5000; 
+
+
 
 
 function money(cents: number) {
@@ -16,6 +25,33 @@ function money(cents: number) {
 function Card({ children, style }: { children:any; style?:any }){
   return <div className="card" style={{ padding:16, borderRadius:12, minWidth:220, ...style }}>{children}</div>;
 }
+
+function ToggleSwitch(props: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  const { checked, disabled, onChange } = props;
+
+  return (
+    <label
+      className={`toggle-switch ${disabled ? "toggle-switch--disabled" : ""}`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        role="switch"
+        aria-checked={checked}
+      />
+      <span className="toggle-track">
+        <span className="toggle-thumb" />
+      </span>
+    </label>
+  );
+}
+
 
 export default function Dashboard() {
   const { accountId, user, logout } = useAuth();
@@ -56,6 +92,15 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [autoDebit, setAutoDebit] = useState<AutoDebitConfig | null>(null);
   const [savingAutoDebit, setSavingAutoDebit] = useState(false);
+  const [toast, setToast] = useState<Toast | null>(null);
+
+
+useEffect(() => {
+  if (!toast) return;
+  const id = setTimeout(() => setToast(null), 4000);
+  return () => clearTimeout(id);
+}, [toast]);
+
 
 
  useEffect(() => {
@@ -83,27 +128,52 @@ export default function Dashboard() {
 
   const otherUsers = useMemo(() => users.filter(u => u.account && u.account.id !== acc?.id), [users, acc]);
 
-  async function doTransfer(toId:number) {
-    if (!accountId) return;
-    setLoading(true);
-    try {
-      await api("/transfer", { method: "POST", json: { fromId: accountId, toId, amount: Math.round(amount*100) } });
-      setTransferOpen(false);
-      setAmount(0);
-      setSelectedTo(null);
-      await refresh();
-    } catch (e:any) {
-      alert(e?.message ?? "Erro");
-    } finally { setLoading(false); }
-  }
+  async function doTransfer(toId: number) {
+  if (!accountId) return;
+  setLoading(true);
 
-  async function handleToggleAutoDebit() {
+  const startedAt = Date.now();
+
+  try {
+    await api("/transfer", {
+      method: "POST",
+      json: { fromId: accountId, toId, amount: Math.round(amount * 100) },
+    });
+
+    // garante um tempo mínimo de "processamento"
+    const elapsed = Date.now() - startedAt;
+    if (elapsed < MIN_TRANSFER_TIME_MS) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, MIN_TRANSFER_TIME_MS - elapsed)
+      );
+    }
+
+    setTransferOpen(false);
+    setAmount(0);
+    setSelectedTo(null);
+    await refresh();
+
+  
+    setToast({
+      type: "success",
+      title: "Sucesso!",
+      message: "Transferência realizada.",
+    });
+  } catch (e: any) {
+   
+    alert(e?.message ?? "Erro");
+  } finally {
+    setLoading(false);
+  }
+}
+
+
+
+  async function handleToggleAutoDebit(nextActive: boolean) {
   if (!accountId) return;
   setSavingAutoDebit(true);
 
   try {
-    const nextActive = !autoDebit?.active;
-
     const updated = await api("/auto-debit", {
       method: "PUT",
       json: {
@@ -114,22 +184,60 @@ export default function Dashboard() {
 
     setAutoDebit(updated);
 
-    if (nextActive) {
-      // Aqui o backend vai disparar o e-mail; no front só avisamos
-      alert("Débito automático ativado! Você receberá um e-mail de confirmação.");
-    } else {
-      alert("Débito automático desativado.");
-    }
+    
+    setToast({
+      type: "success",
+      title: "Sucesso!",
+      message: nextActive
+        ? "Débito automático ativado."
+        : "Débito automático desativado.",
+    });
   } catch (e: any) {
-    alert(e?.message ?? "Erro ao salvar débito automático");
+    
+    setToast({
+      type: "error",
+      title: "Erro",
+      message:
+        e?.message ?? "Erro ao salvar configuração de débito automático.",
+    });
   } finally {
     setSavingAutoDebit(false);
   }
 }
 
 
+
+
   return (
     <section className="container">
+
+      
+  {toast && (
+    <div
+      style={{
+        position: "fixed",
+        top: 16,
+        right: 16,
+        zIndex: 9999,
+      }}
+    >
+      <div
+        style={{
+          background: toast.type === "success" ? "#16a34a" : "#ef4444",
+          color: "#ffffff",
+          padding: "12px 16px",
+          borderRadius: 12,
+          boxShadow: "0 10px 25px rgba(15,23,42,0.35)",
+          minWidth: 220,
+          fontSize: 14,
+        }}
+      >
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>{toast.title}</div>
+        <div>{toast.message}</div>
+      </div>
+    </div>
+  )}
+
       <div style={{ display: "grid", gap: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
@@ -181,27 +289,33 @@ export default function Dashboard() {
             </ul>
           </Card>
 
-          <Card>
+         <Card>
   <h3>Débito automático</h3>
-  <p>Ative para que seus pagamentos recorrentes sejam realizados automaticamente.</p>
+  <p>
+    Ative para que seus pagamentos recorrentes sejam realizados
+    automaticamente.
+  </p>
 
-  <label
+  <div
     style={{
       display: "flex",
       alignItems: "center",
-      gap: 8,
-      marginTop: 8,
-      cursor: savingAutoDebit ? "not-allowed" : "pointer",
+      justifyContent: "space-between",
+      marginTop: 16,
+      gap: 12,
     }}
   >
-    <input
-      type="checkbox"
-      checked={!!autoDebit?.active}
-      onChange={handleToggleAutoDebit}
-      disabled={savingAutoDebit}
-    />
-    <span>{autoDebit?.active ? "Ativado" : "Desativado"}</span>
-  </label>
+    <div style={{ fontSize: 14, color: "var(--muted)" }}>
+      {autoDebit?.active ? "Ativado" : "Desativado"}
+    </div>
+
+    <ToggleSwitch
+  checked={!!autoDebit?.active}
+  disabled={savingAutoDebit}
+  onChange={handleToggleAutoDebit}
+/>
+
+  </div>
 
   {savingAutoDebit && (
     <div style={{ marginTop: 4, fontSize: 12, color: "var(--muted)" }}>
@@ -209,12 +323,13 @@ export default function Dashboard() {
     </div>
   )}
 
-  {autoDebit && autoDebit.active && (
-    <div style={{ marginTop: 8, fontSize: 12, color: "var(--muted)" }}>
-      Quando você ativar, um e-mail de confirmação é enviado para {user?.email}.
-    </div>
-  )}
+  <div style={{ marginTop: 8, fontSize: 12, color: "var(--muted)" }}>
+    {autoDebit?.active
+      ? `Quando você ativar, um e-mail de confirmação é enviado para ${user?.email}.`
+      : `Ao ativar, um e-mail de confirmação será enviado para ${user?.email}.`}
+  </div>
 </Card>
+
 
 
           <Card>
@@ -224,31 +339,104 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <Modal open={transferOpen} title="Transferir" onClose={() => setTransferOpen(false)} onConfirm={undefined} hideFooter={true}>
-        <div style={{ display:"grid", gap:8, minWidth:240, width: "min(92vw,420px)", boxSizing: "border-box" }}>
-          <label>Destinatário
-            <select value={selectedTo ?? ""} onChange={e=>setSelectedTo(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">-- selecione --</option>
-              {otherUsers.map(u => u.account && <option key={u.id} value={u.account.id}>{u.name} — Conta #{u.account.id}</option>)}
-            </select>
-          </label>
+      <Modal
+  open={transferOpen}
+  title="Transferir"
+  onClose={() => setTransferOpen(false)}
+  onConfirm={undefined}
+  hideFooter={true}
+>
+  <div
+    style={{
+      display: "grid",
+      gap: 8,
+      minWidth: 240,
+      width: "min(92vw,420px)",
+      boxSizing: "border-box",
+    }}
+  >
+    <label>
+      Destinatário
+      <select
+        value={selectedTo ?? ""}
+        onChange={(e) =>
+          setSelectedTo(e.target.value ? Number(e.target.value) : null)
+        }
+      >
+        <option value="">-- selecione --</option>
+        {otherUsers.map(
+          (u) =>
+            u.account && (
+              <option key={u.id} value={u.account.id}>
+                {u.name} — Conta #{u.account.id}
+              </option>
+            )
+        )}
+      </select>
+    </label>
 
-          <label>Valor (R$)
-            <input type="number" step="0.01" value={amount || ""} onChange={e=>setAmount(Number(e.target.value))} style={{ width: "100%", boxSizing: "border-box" }} />
-          </label>
+    <label>
+      Valor (R$)
+      <input
+        type="number"
+        step="0.01"
+        value={amount || ""}
+        onChange={(e) => setAmount(Number(e.target.value))}
+        style={{ width: "100%", boxSizing: "border-box" }}
+      />
+    </label>
 
-          <div style={{ display:"flex", gap:8, flexWrap: "wrap" }}>
-            {[10,50,100,200].map(v => (
-              <button key={v} onClick={() => setAmount(v)} style={{ flex:1, minWidth: 80 }}>R$ {v}</button>
-            ))}
-          </div>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {[10, 50, 100, 200].map((v) => (
+        <button
+          key={v}
+          type="button"
+          onClick={() => setAmount(v)}
+          style={{ flex: 1, minWidth: 80 }}
+        >
+          R$ {v}
+        </button>
+      ))}
+    </div>
 
-          <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
-            <button onClick={() => setTransferOpen(false)}>Cancelar</button>
-            <button disabled={!selectedTo || !amount || loading} onClick={() => selectedTo && doTransfer(selectedTo)}>{loading ? "Enviando..." : "Confirmar"}</button>
-          </div>
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        justifyContent: "flex-end",
+      }}
+    >
+      {loading && (
+        <div
+          style={{
+            marginRight: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 12,
+            color: "var(--muted)",
+          }}
+        >
+          <span className="loader-circle" />
+          <span>Processando transferência...</span>
         </div>
-      </Modal>
+      )}
+
+      <button type="button" onClick={() => setTransferOpen(false)}>
+        Cancelar
+      </button>
+      <button
+        disabled={!selectedTo || !amount || loading}
+        onClick={() => selectedTo && doTransfer(selectedTo)}
+      >
+        {loading ? "Enviando..." : "Confirmar"}
+      </button>
+    </div>
+  </div>
+</Modal>
+
+
     </section>
   );
 }

@@ -251,7 +251,8 @@ app.post("/auth/forgot-password", async (req, res) => {
 // ====== ROTAS DE NEGÓCIO (PROTEGIDAS) ======
 app.use(authMiddleware);
 
-// GET /users -> lista contatos com account
+
+// GET /users -> lista contatos simples (para Dashboard)
 app.get("/users", async (req, res) => {
   try {
     const users = await prisma.user.findMany({
@@ -276,6 +277,77 @@ app.get("/users", async (req, res) => {
     return res.status(500).json({ error: "Erro ao listar usuários" });
   }
 });
+
+// GET /users-with-transactions -> usado pela tela "Histórico de Transações"
+app.get("/users-with-transactions", async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      include: {
+        account: {
+          include: {
+            txsFrom: {
+              orderBy: { createdAt: "desc" },
+              take: 10,
+            },
+            txsTo: {
+              orderBy: { createdAt: "desc" },
+              take: 10,
+            },
+          },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const result = users.map((u) => {
+      const acc = u.account;
+
+      let recentTx = [];
+      if (acc) {
+        recentTx = [...acc.txsFrom, ...acc.txsTo]
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+          .slice(0, 5)
+          .map((t) => ({
+            id: t.id,
+            fromId: t.fromId,
+            toId: t.toId,
+            amount: t.amount,
+            createdAt: t.createdAt,
+          }));
+      }
+
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        createdAt: u.createdAt,
+        account: acc
+          ? {
+              id: acc.id,
+              userId: acc.userId,
+              balance: acc.balance,
+              createdAt: acc.createdAt,
+            }
+          : null,
+        recentTx,
+      };
+    });
+
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ error: "Erro ao listar usuários com transações" });
+  }
+});
+
+
+
+
 
 // GET /accounts/:id -> detalhes da conta
 app.get("/accounts/:id", async (req, res) => {

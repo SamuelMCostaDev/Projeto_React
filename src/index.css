@@ -355,6 +355,77 @@ body {
   background: transparent;
 }
 
+/* ==== Toggle switch para débito automático ==== */
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+}
+
+.toggle-track {
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: #cbd5f5; /* tom neutro */
+  padding: 3px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.2s ease;
+}
+
+.toggle-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+  transform: translateX(0);
+  transition: transform 0.2s ease;
+}
+
+/* ligado */
+.toggle-switch input:checked + .toggle-track {
+  background: var(--accent);
+}
+
+.toggle-switch input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(18px);
+}
+
+/* desabilitado */
+.toggle-switch--disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* ==== Spinner circular para carregamento ==== */
+.loader-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(148, 163, 184, 0.4); /* borda “apagada” */
+  border-top-color: var(--accent);            /* cor principal girando */
+  display: inline-block;
+  animation: loader-spin 0.6s linear infinite;
+}
+
+@keyframes loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
 
 /* classe aplicada no body nas telas de auth */
 body.bg-hero {
