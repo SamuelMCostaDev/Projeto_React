@@ -6,6 +6,8 @@ import Modal from "../components/Modal";
 type Account = { id:number; balance:number };
 type Tx = { id:number; fromId:number|null; toId:number|null; amount:number; createdAt:string };
 type UserWithAccount = { id:number; name:string; email:string; account: { id:number } | null };
+type AutoDebitConfig = { id: number; accountId: number; active: boolean };
+
 
 function money(cents: number) {
   return (cents/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -52,12 +54,23 @@ export default function Dashboard() {
   const [selectedTo, setSelectedTo] = useState<number | null>(null);
   const [amount, setAmount] = useState<number>(0);
   const [loading, setLoading] = useState(false);
+  const [autoDebit, setAutoDebit] = useState<AutoDebitConfig | null>(null);
+  const [savingAutoDebit, setSavingAutoDebit] = useState(false);
 
-  useEffect(() => {
-    if (!accountId) return;
-    refresh();
-    api("/users").then(setUsers).catch(()=>{});
-  }, [accountId]);
+
+ useEffect(() => {
+  if (!accountId) return;
+  refresh();
+  api("/users").then(setUsers).catch(()=>{});
+
+  // busca config de débito automático da conta
+  api(`/auto-debit?accountId=${accountId}`)
+    .then((cfg) => setAutoDebit(cfg))
+    .catch(() => {
+      // se ainda não existir config, só ignoramos o erro
+    });
+}, [accountId]);
+
 
   async function refresh(){
     if (!accountId) return;
@@ -84,6 +97,37 @@ export default function Dashboard() {
     } finally { setLoading(false); }
   }
 
+  async function handleToggleAutoDebit() {
+  if (!accountId) return;
+  setSavingAutoDebit(true);
+
+  try {
+    const nextActive = !autoDebit?.active;
+
+    const updated = await api("/auto-debit", {
+      method: "PUT",
+      json: {
+        accountId,
+        active: nextActive,
+      },
+    });
+
+    setAutoDebit(updated);
+
+    if (nextActive) {
+      // Aqui o backend vai disparar o e-mail; no front só avisamos
+      alert("Débito automático ativado! Você receberá um e-mail de confirmação.");
+    } else {
+      alert("Débito automático desativado.");
+    }
+  } catch (e: any) {
+    alert(e?.message ?? "Erro ao salvar débito automático");
+  } finally {
+    setSavingAutoDebit(false);
+  }
+}
+
+
   return (
     <section className="container">
       <div style={{ display: "grid", gap: 16 }}>
@@ -98,7 +142,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 45 }}>
           <Card>
             <h3>Transferir</h3>
             <p>Envie dinheiro para outra conta usando a lista de contatos.</p>
@@ -136,6 +180,42 @@ export default function Dashboard() {
               ))}
             </ul>
           </Card>
+
+          <Card>
+  <h3>Débito automático</h3>
+  <p>Ative para que seus pagamentos recorrentes sejam realizados automaticamente.</p>
+
+  <label
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 8,
+      cursor: savingAutoDebit ? "not-allowed" : "pointer",
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={!!autoDebit?.active}
+      onChange={handleToggleAutoDebit}
+      disabled={savingAutoDebit}
+    />
+    <span>{autoDebit?.active ? "Ativado" : "Desativado"}</span>
+  </label>
+
+  {savingAutoDebit && (
+    <div style={{ marginTop: 4, fontSize: 12, color: "var(--muted)" }}>
+      Salvando preferências...
+    </div>
+  )}
+
+  {autoDebit && autoDebit.active && (
+    <div style={{ marginTop: 8, fontSize: 12, color: "var(--muted)" }}>
+      Quando você ativar, um e-mail de confirmação é enviado para {user?.email}.
+    </div>
+  )}
+</Card>
+
 
           <Card>
             <h3>Ajuda / Suporte</h3>

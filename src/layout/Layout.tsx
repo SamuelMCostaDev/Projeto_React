@@ -47,7 +47,7 @@ export default function Layout() {
 
           {!user && (
             <>
-              <NavLink to="/signup" style={linkStyle}>Sign up</NavLink>
+              <NavLink to="/signup" style={linkStyle}>Cadastro</NavLink>
               <NavLink to="/login" style={linkStyle}>Login</NavLink>
             </>
           )}

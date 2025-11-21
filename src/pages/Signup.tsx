@@ -40,24 +40,31 @@ export default function Signup() {
   const navigate = useNavigate();
 
   const onSubmit = async (data: FormData) => {
-    try {
-      const payload = { name: data.name, email: data.email, password: data.password };
-      await api("/auth/signup", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      alert("Conta criada com sucesso! Faça login para entrar.");
-      navigate("/login", { replace: true });
-    } catch (e) {
-      const msg = (e as Error).message || "Erro ao cadastrar.";
-      if (msg.includes("email já usado") || msg.includes("409")) {
-        alert("Este e-mail já possui conta. Faça login.");
-        navigate("/login");
-      } else {
-        alert(msg);
-      }
+  try {
+    const payload = {
+      name: data.name,
+      email: data.email,
+      password: data.password,
+    };
+
+    await api("/auth/register", {
+      method: "POST",
+      json: payload, // em vez de body: JSON.stringify(...)
+    });
+
+    alert("Conta criada com sucesso! Faça login para entrar.");
+    navigate("/login", { replace: true });
+  } catch (e) {
+    const msg = (e as Error).message || "Erro ao cadastrar.";
+    if (msg.includes("email já cadastrado") || msg.includes("409")) {
+      alert("Este e-mail já possui conta. Faça login.");
+      navigate("/login");
+    } else {
+      alert(msg);
     }
-  };
+  }
+};
+
 
   return (
     <section className="container" style={{ maxWidth: 560 }}>

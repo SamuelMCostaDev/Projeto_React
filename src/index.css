@@ -26,11 +26,10 @@ a:hover { opacity: 0.9; }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
-  min-height: 100vh;
+  /* nada de flex aqui */
 }
+
 
 /* ===== Tema CLARO ===== */
 :root[data-theme="light"] {
@@ -267,9 +266,20 @@ nav button {
   margin-right: calc(50% - 50vw);
 }
 
-/* Garantir que nada por trás force branco */
-html, body, #root {
-  height: 100%;
+
+
+/* o fundo REAL deve ficar no body, não em divs internas */
+body.bg-dashboard,
+body.bg-hero {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* importante: o root não pode pintar de branco por cima do body */
+#root {
+  min-height: 100vh;
   background: transparent;
 }
 
@@ -306,10 +316,7 @@ body.home-bg::before {
   background-attachment: fixed;  /* opcional parallax */
 }
 
-/* garante que a página ocupe a altura toda e não “corte” o fundo */
-html, body, #root {
-  min-height: 100%;
-}
+
 
 .topbar {
   background: transparent !important;
@@ -333,8 +340,21 @@ html, body, #root {
   background-repeat: no-repeat;
 }
 
-/* garante que o body ocupe a viewport */
-html, body, #root { height: 100%; }
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+  background: transparent;
+}
+
 
 /* classe aplicada no body nas telas de auth */
 body.bg-hero {
