@@ -6,10 +6,30 @@ const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const { Resend } = require("resend");
 
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const nodemailer = require("nodemailer");
+
+// Transporter global usando Outlook / Hotmail
+const mailer = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "smtp-mail.outlook.com",
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: false, // 587 = STARTTLS
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+// Opcional: testar conexão ao subir a API
+mailer.verify((err, success) => {
+  if (err) {
+    console.error("[mailer] Falha ao conectar no SMTP:", err.message);
+  } else {
+    console.log("[mailer] Conexão SMTP OK");
+  }
+});
+
 
 
 const app = express();
@@ -43,12 +63,49 @@ function authMiddleware(req, res, next) {
 
 
 
+async function sendEmailVerification(to, name, token) {
+  const appName = process.env.APP_NAME || "Banco Demo";
+  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
+
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const verifyUrl = `${frontendUrl}/verify-email?token=${encodeURIComponent(
+    token
+  )}`;
+
+  console.log("[verify-email] Enviando e-mail de verificação para:", to);
+  console.log("  URL:", verifyUrl);
+
+  await mailer.sendMail({
+    from,
+    to,
+    subject: `${appName} - Confirme seu e-mail`,
+    html: `
+      <p>Olá, <strong>${name}</strong>!</p>
+      <p>Obrigado por criar sua conta no <strong>${appName}</strong>.</p>
+      <p>Clique no link abaixo para confirmar seu e-mail e liberar o acesso:</p>
+      <p><a href="${verifyUrl}" target="_blank" rel="noreferrer">${verifyUrl}</a></p>
+      <p>Este link é válido por 24 horas.</p>
+      <p>Se você não fez este cadastro, pode ignorar este e-mail.</p>
+      <p>Abraços,<br />${appName}</p>
+    `,
+  });
+
+  console.log("[verify-email] E-mail enviado com sucesso.");
+}
+
+
+
+
+
+
+
 async function sendAutoDebitEmail(to, name) {
   const appName = process.env.APP_NAME || "Banco Demo";
-  const from =
-    process.env.EMAIL_FROM || "Banco Demo <onboarding@resend.dev>";
+  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
 
-  const result = await resend.emails.send({
+  console.log("[auto-debit] Enviando e-mail para:", to);
+
+  await mailer.sendMail({
     from,
     to,
     subject: "Débito automático ativado",
@@ -61,49 +118,71 @@ async function sendAutoDebitEmail(to, name) {
     `,
   });
 
-  console.log("Email Resend enviado:", result.id || result);
+  console.log("[auto-debit] E-mail de débito automático enviado.");
 }
+
 
 async function sendPasswordResetEmail(to, name, token) {
   const appName = process.env.APP_NAME || "Banco Demo";
-  const from =
-    process.env.EMAIL_FROM || "Banco Demo <onboarding@resend.dev>";
+  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
 
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
   const resetUrl = `${frontendUrl}/reset-password?token=${encodeURIComponent(
     token
   )}`;
 
-  try {
-    const result = await resend.emails.send({
-      from,
-      to,
-      subject: `${appName} - Redefinição de senha`,
-      html: `
-        <p>Olá, <strong>${name}</strong>!</p>
-        <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
-        <p>Clique no link abaixo para criar uma nova senha:</p>
-        <p><a href="${resetUrl}" target="_blank" rel="noreferrer">${resetUrl}</a></p>
-        <p>Este link é válido por 1 hora.</p>
-        <p>Se você não fez esta solicitação, pode ignorar este e-mail com segurança.</p>
-        <p>Abraços,<br />${appName}</p>
-      `,
-    });
+  console.log("[reset-password] Enviando e-mail para:", to);
 
-    if (result.error) {
-      console.error("Erro Resend (reset):", result.error);
-      throw new Error(
-        result.error.message || "Falha ao enviar e-mail de recuperação"
-      );
-    }
+  await mailer.sendMail({
+    from,
+    to,
+    subject: `${appName} - Redefinição de senha`,
+    html: `
+      <p>Olá, <strong>${name}</strong>!</p>
+      <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
+      <p>Clique no link abaixo para criar uma nova senha:</p>
+      <p><a href="${resetUrl}" target="_blank" rel="noreferrer">${resetUrl}</a></p>
+      <p>Este link é válido por 1 hora.</p>
+      <p>Se você não fez esta solicitação, pode ignorar este e-mail com segurança.</p>
+      <p>Abraços,<br />${appName}</p>
+    `,
+  });
 
-    console.log("Email de reset enviado, id:", result.data?.id || result);
-  } catch (err) {
-    console.error("Erro ao enviar e-mail de reset:", err);
-    throw err; // deixa a rota saber que deu erro
-  }
+  console.log("[reset-password] E-mail enviado com sucesso.");
 }
 
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generateRandomCharges() {
+  const descriptions = [
+    "Uber",
+    "iFood",
+    "Netflix",
+    "Spotify",
+    "Amazon",
+    "Padaria Central",
+    "Posto Shell",
+    "Farmácia Popular",
+  ];
+
+  const count = randomInt(3, 6); // 3 a 6 gastos
+  const charges = [];
+
+  for (let i = 0; i < count; i++) {
+    const desc = descriptions[randomInt(0, descriptions.length - 1)];
+    const amount = randomInt(2000, 50000); // R$ 20,00 a R$ 500,00
+    charges.push({
+      description: desc,
+      amount,
+      paid: false,
+    });
+  }
+
+  return charges;
+}
 
 
 
@@ -114,7 +193,9 @@ app.post("/auth/register", async (req, res) => {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({ error: "name, email e password são obrigatórios" });
+      return res
+        .status(400)
+        .json({ error: "name, email e password são obrigatórios" });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -124,11 +205,18 @@ app.post("/auth/register", async (req, res) => {
 
     const hashed = await bcrypt.hash(password, 10);
 
+    // 👇 gera token de verificação (24h)
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    const verifyTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
     const user = await prisma.user.create({
       data: {
         name,
         email,
         password: hashed,
+        emailVerified: false,
+        verifyToken,
+        verifyTokenExpires,
         account: {
           create: {
             balance: 0,
@@ -138,18 +226,20 @@ app.post("/auth/register", async (req, res) => {
       include: { account: true },
     });
 
-    const token = generateToken(user);
+    // dispara e-mail E SE DER ERRO a requisição falha
+await sendEmailVerification(user.email, user.name, verifyToken);
 
-    return res.json({
-      token,
-      user: { id: user.id, name: user.name, email: user.email },
-      accountId: user.account?.id || null,
-    });
+return res.status(201).json({
+  ok: true,
+  message: "Usuário registrado. Verifique seu e-mail para ativar a conta.",
+});
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Erro ao registrar" });
   }
 });
+
 
 // Login
 app.post("/auth/login", async (req, res) => {
@@ -171,6 +261,14 @@ app.post("/auth/login", async (req, res) => {
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) {
       return res.status(400).json({ error: "Usuário ou senha inválidos" });
+    }
+
+
+    // 👇 novo: exigir e-mail confirmado
+    if (!user.emailVerified) {
+      return res
+        .status(403)
+        .json({ error: "Confirme seu e-mail antes de fazer login." });
     }
 
     const token = generateToken(user);
@@ -248,8 +346,279 @@ app.post("/auth/forgot-password", async (req, res) => {
 });
 
 
+
+// Confirmação de e-mail
+app.get("/auth/verify-email", async (req, res) => {
+  try {
+    const raw = req.query.token;
+    const token = (Array.isArray(raw) ? raw[0] : raw || "").toString().trim();
+
+    console.log("[verify-email] Token recebido:", token);
+
+    if (!token) {
+      return res.status(400).json({ error: "Token é obrigatório" });
+    }
+
+    const now = new Date();
+
+    // como verifyToken é unique no schema, usa findUnique
+    const user = await prisma.user.findUnique({
+      where: { verifyToken: token },
+    });
+
+    if (!user) {
+      console.log("[verify-email] Nenhum usuário encontrado com esse token");
+      return res
+        .status(400)
+        .json({ error: "Token inválido ou expirado. Faça um novo cadastro." });
+    }
+
+    if (!user.verifyTokenExpires || user.verifyTokenExpires <= now) {
+      console.log(
+        "[verify-email] Token expirado para user id=",
+        user.id,
+        " expires=",
+        user.verifyTokenExpires
+      );
+      return res
+        .status(400)
+        .json({ error: "Token inválido ou expirado. Faça um novo cadastro." });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        verifyToken: null,
+        verifyTokenExpires: null,
+      },
+    });
+
+    console.log("[verify-email] E-mail confirmado para user id=", user.id);
+
+    return res.json({ ok: true, message: "E-mail confirmado com sucesso." });
+  } catch (err) {
+    console.error("Erro ao verificar e-mail:", err);
+    return res
+      .status(500)
+      .json({ error: "Erro ao confirmar e-mail. Tente novamente." });
+  }
+});
+
+
+
+
 // ====== ROTAS DE NEGÓCIO (PROTEGIDAS) ======
 app.use(authMiddleware);
+
+
+// GET /card?accountId=123 -> dados do cartão + fatura + gastos
+app.get("/card", async (req, res) => {
+  try {
+    const accountId = Number(req.query.accountId);
+    if (!accountId) {
+      return res.status(400).json({ error: "accountId é obrigatório" });
+    }
+
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: "Conta não encontrada" });
+    }
+
+    // buscamos cartão + gastos não pagos
+    let card = await prisma.creditCard.findUnique({
+      where: { accountId },
+      include: {
+        charges: {
+          where: { paid: false },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    // se não existir cartão, criamos um com gastos aleatórios
+    if (!card) {
+      const last4 = String(1000 + Math.floor(Math.random() * 9000));
+
+      card = await prisma.creditCard.create({
+        data: {
+          accountId,
+          brand: "Visa",
+          last4,
+          limit: 500000, // R$ 5.000,00
+          charges: {
+            create: generateRandomCharges(),
+          },
+        },
+        include: {
+          charges: {
+            where: { paid: false },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      });
+    } else if (card.charges.length === 0) {
+      // se já existe cartão mas não tem gastos em aberto, gera uma nova fatura
+      card = await prisma.creditCard.update({
+        where: { id: card.id },
+        data: {
+          charges: {
+            create: generateRandomCharges(),
+          },
+        },
+        include: {
+          charges: {
+            where: { paid: false },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      });
+    }
+
+    // recalcula valor da fatura com base nos charges não pagos
+    const invoiceAmount = card.charges.reduce(
+      (sum, c) => sum + c.amount,
+      0
+    );
+
+    if (card.invoiceAmount !== invoiceAmount) {
+      card = await prisma.creditCard.update({
+        where: { id: card.id },
+        data: { invoiceAmount },
+        include: {
+          charges: {
+            where: { paid: false },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      });
+    }
+
+    const availableLimit = card.limit - card.invoiceAmount;
+
+    return res.json({
+      id: card.id,
+      brand: card.brand,
+      last4: card.last4,
+      limit: card.limit,
+      invoiceAmount: card.invoiceAmount,
+      availableLimit,
+      charges: card.charges,
+    });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ error: "Erro ao buscar informações do cartão" });
+  }
+});
+
+
+
+// POST /card/pay { accountId } -> paga a fatura do cartão
+app.post("/card/pay", async (req, res) => {
+  const { accountId } = req.body || {};
+
+  if (!accountId) {
+    return res.status(400).json({ error: "accountId é obrigatório" });
+  }
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const account = await tx.account.findUnique({
+        where: { id: accountId },
+      });
+
+      if (!account) throw new Error("Conta não encontrada");
+
+      const card = await tx.creditCard.findUnique({
+        where: { accountId },
+        include: {
+          charges: {
+            where: { paid: false },
+          },
+        },
+      });
+
+      if (!card) throw new Error("Cartão não encontrado");
+
+      const unpaidCharges = card.charges;
+      const total = unpaidCharges.reduce((sum, c) => sum + c.amount, 0);
+
+      if (total === 0) {
+        const err = new Error("Nenhuma fatura em aberto");
+        err.code = "NO_INVOICE";
+        throw err;
+      }
+
+      if (account.balance < total) {
+        const err = new Error("Saldo insuficiente para pagar a fatura");
+        err.code = "INSUFFICIENT_FUNDS";
+        throw err;
+      }
+
+      // debita da conta
+      const updatedAccount = await tx.account.update({
+        where: { id: accountId },
+        data: { balance: account.balance - total },
+      });
+
+      // registra transação de saída (para o "banco do cartão")
+      await tx.transaction.create({
+        data: {
+          fromId: accountId,
+          toId: null,
+          amount: total,
+        },
+      });
+
+      // marca todos os gastos como pagos
+      await tx.cardCharge.updateMany({
+        where: { cardId: card.id, paid: false },
+        data: { paid: true },
+      });
+
+      // zera valor da fatura
+      const updatedCard = await tx.creditCard.update({
+        where: { id: card.id },
+        data: { invoiceAmount: 0 },
+        include: {
+          charges: {
+            where: { paid: false },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      });
+
+      const availableLimit = updatedCard.limit - updatedCard.invoiceAmount;
+
+      return {
+        account: updatedAccount,
+        card: {
+          id: updatedCard.id,
+          brand: updatedCard.brand,
+          last4: updatedCard.last4,
+          limit: updatedCard.limit,
+          invoiceAmount: updatedCard.invoiceAmount,
+          availableLimit,
+          charges: updatedCard.charges,
+        },
+      };
+    });
+
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    if (err.code === "INSUFFICIENT_FUNDS" || err.code === "NO_INVOICE") {
+      return res.status(400).json({ error: err.message });
+    }
+    return res.status(500).json({ error: "Erro ao pagar fatura" });
+  }
+});
+
 
 
 // GET /users -> lista contatos simples (para Dashboard)

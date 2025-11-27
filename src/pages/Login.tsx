@@ -11,7 +11,6 @@ export default function Login() {
     register,
     handleSubmit,
     formState: { errors },
-    getValues,
   } = useForm<F>();
   const { login } = useAuth();
   const nav = useNavigate();
@@ -48,7 +47,7 @@ export default function Login() {
   const onSubmit = async (data: F) => {
     const email = (data.email || "").trim();
 
-    // 👉 MODO RECUPERAÇÃO: botão "Entrar" vira "Enviar e-mail de recuperação"
+    // 👉 MODO RECUPERAÇÃO
     if (recoveryMode) {
       if (!email) {
         setInfo("");
@@ -91,14 +90,6 @@ export default function Login() {
       );
     }
   };
-
-  function handleForgotPassword() {
-    setRecoveryMode(true);
-    setError("");
-    setInfo(
-      "Informe seu e-mail e clique em 'Enviar link de recuperação' para receber as instruções."
-    );
-  }
 
   return (
     <section
@@ -185,6 +176,28 @@ export default function Login() {
             </label>
           )}
 
+          {/* 👇 Nova checkbox "Esqueci minha senha" */}
+          <label
+            className="checkbox-row"
+            style={{ marginTop: 8, marginBottom: 4 }}
+          >
+            <input
+              type="checkbox"
+              checked={recoveryMode}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setRecoveryMode(checked);
+                setError("");
+                setInfo(
+                  checked
+                    ? "Informe seu e-mail e clique em 'Enviar link de recuperação' para receber as instruções."
+                    : ""
+                );
+              }}
+            />
+            <span>Esqueci minha senha</span>
+          </label>
+
           <button type="submit" style={{ height: 44 }}>
             {recoveryMode ? "Enviar link de recuperação" : "Entrar"}
           </button>
@@ -192,23 +205,6 @@ export default function Login() {
 
         <p style={{ marginTop: 12, textAlign: "center" }}>
           Novo aqui? <Link to="/signup">Crie sua conta</Link>
-        </p>
-
-        <p style={{ marginTop: 8, textAlign: "center" }}>
-          <button
-            type="button"
-            onClick={handleForgotPassword}
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              color: "#3366ff",
-              cursor: "pointer",
-              fontSize: 14,
-            }}
-          >
-            Esqueci minha senha
-          </button>
         </p>
       </div>
     </section>

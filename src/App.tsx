@@ -9,26 +9,36 @@ import Users from "./pages/Users";
 import NotFound from "./pages/NotFound";
 import UserDetail from "./pages/UserDetail";
 import Signup from "./pages/Signup";
-import Protected from "./components/Protected";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
+import VerifyEmail from "./pages/VerifyEmail"; // 👈 NOVO
 
 const router = createBrowserRouter([
-  { element: <Layout />, children: [
+  {
+    element: <Layout />,
+    children: [
       { path: "/", element: <Home /> },
-      { path: "*", element: <NotFound /> }, 
+
+      // rotas públicas
       { path: "/signup", element: <Signup /> },
-      { path: "/login", element: <Login/>},
+      { path: "/login", element: <Login /> },
+      { path: "/verify-email", element: <VerifyEmail /> }, 
+
+      // rotas protegidas
       {
-        element: <ProtectedRoute />, 
+        element: <ProtectedRoute />,
         children: [
           { path: "/dashboard", element: <Dashboard /> },
           { path: "/users", element: <Users /> },
           { path: "/users/:id", element: <UserDetail /> },
         ],
       },
-  ]},
+
+      // fallback 404
+      { path: "*", element: <NotFound /> },
+    ],
+  },
 ]);
 
 export default function App() {

@@ -18,6 +18,10 @@ model User {
   createdAt DateTime @default(now())
 
   passwordResets PasswordReset[]
+
+  emailVerified       Boolean   @default(false)
+  verifyToken         String?   @unique
+  verifyTokenExpires  DateTime?
 }
 
 model PasswordReset {
@@ -39,8 +43,11 @@ model Account {
   txsFrom   Transaction[] @relation("from")
   txsTo     Transaction[] @relation("to")
 
+  // novos relacionamentos
+  card      CreditCard?
   autoDebit AutoDebit?
 }
+
 
 model Transaction {
   id        Int      @id @default(autoincrement())
@@ -61,3 +68,28 @@ model AutoDebit {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model CreditCard {
+  id            Int          @id @default(autoincrement())
+  accountId     Int          @unique
+  account       Account      @relation(fields: [accountId], references: [id])
+  brand         String
+  last4         String
+  limit         Int          // limite total em centavos
+  invoiceAmount Int          @default(0)  // total da fatura em aberto
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  charges       CardCharge[]
+}
+
+model CardCharge {
+  id          Int         @id @default(autoincrement())
+  cardId      Int
+  card        CreditCard  @relation(fields: [cardId], references: [id])
+  description String
+  amount      Int         // centavos
+  paid        Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+}
+

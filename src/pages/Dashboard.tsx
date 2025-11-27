@@ -13,6 +13,25 @@ type Toast = {
   message: string;
 };
 
+type CardCharge = {
+  id: number;
+  description: string;
+  amount: number;
+  createdAt: string;
+  paid?: boolean;
+};
+
+type CreditCardInfo = {
+  id: number;
+  brand: string;
+  last4: string;
+  limit: number;
+  invoiceAmount: number;
+  availableLimit: number;
+  charges: CardCharge[];
+};
+
+
 const MIN_TRANSFER_TIME_MS = 5000; 
 
 
@@ -94,6 +113,10 @@ export default function Dashboard() {
   const [savingAutoDebit, setSavingAutoDebit] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
 
+  const [cardInfo, setCardInfo] = useState<CreditCardInfo | null>(null);
+  const [payingInvoice, setPayingInvoice] = useState(false);
+
+
 
 useEffect(() => {
   if (!toast) return;
@@ -114,7 +137,71 @@ useEffect(() => {
     .catch(() => {
       // se ainda não existir config, só ignoramos o erro
     });
+
+    loadCard();
 }, [accountId]);
+
+
+
+async function handlePayInvoice() {
+  if (!accountId || !cardInfo) return;
+
+  if (!cardInfo.invoiceAmount) {
+    setToast({
+      type: "error",
+      title: "Nada a pagar",
+      message: "Sua fatura já está em dia.",
+    });
+    return;
+  }
+
+  setPayingInvoice(true);
+  const startedAt = Date.now();
+
+  try {
+    const res = await api("/card/pay", {
+      method: "POST",
+      json: { accountId },
+    });
+
+    // res.card vem da rota
+    const elapsed = Date.now() - startedAt;
+    if (elapsed < 1500) {
+      await new Promise((r) => setTimeout(r, 1500 - elapsed));
+    }
+
+    await refresh(); // atualiza saldo / extrato
+    setCardInfo(res.card);
+
+    setToast({
+      type: "success",
+      title: "Fatura paga!",
+      message: "Pagamento da fatura realizado com sucesso.",
+    });
+  } catch (e: any) {
+    setToast({
+      type: "error",
+      title: "Erro ao pagar fatura",
+      message: e?.message ?? "Não foi possível pagar a fatura.",
+    });
+  } finally {
+    setPayingInvoice(false);
+  }
+}
+
+
+
+
+async function loadCard() {
+  if (!accountId) return;
+  try {
+    const card = await api(`/card?accountId=${accountId}`);
+    setCardInfo(card);
+  } catch (e) {
+    // silencioso por enquanto
+  }
+}
+
 
 
   async function refresh(){
@@ -329,6 +416,106 @@ useEffect(() => {
       : `Ao ativar, um e-mail de confirmação será enviado para ${user?.email}.`}
   </div>
 </Card>
+
+
+<Card>
+  <h3>Fatura do cartão</h3>
+
+  {!cardInfo ? (
+    <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 8 }}>
+      Carregando informações do cartão...
+    </p>
+  ) : (
+    <>
+      <div
+        style={{
+          marginTop: 4,
+          fontSize: 14,
+          color: "var(--muted)",
+        }}
+      >
+        {cardInfo.brand} •••• {cardInfo.last4}
+      </div>
+
+      <div style={{ marginTop: 8, fontSize: 14 }}>
+        Limite total: <strong>{money(cardInfo.limit)}</strong>
+      </div>
+      <div style={{ marginTop: 2, fontSize: 14, color: "var(--muted)" }}>
+        Limite disponível:{" "}
+        <strong>{money(cardInfo.availableLimit)}</strong>
+      </div>
+
+      <div style={{ marginTop: 12, fontSize: 16 }}>
+        Fatura atual:{" "}
+        <strong>{money(cardInfo.invoiceAmount)}</strong>
+      </div>
+
+      <button
+        style={{ marginTop: 12, width: "100%" }}
+        disabled={
+          payingInvoice ||
+          !cardInfo.invoiceAmount ||
+          !acc ||
+          acc.balance < cardInfo.invoiceAmount
+        }
+        onClick={handlePayInvoice}
+      >
+        {payingInvoice ? "Pagando fatura..." : "Pagar fatura"}
+      </button>
+
+      {acc && acc.balance < cardInfo.invoiceAmount && (
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: 12,
+            color: "#ef4444",
+          }}
+        >
+          Saldo insuficiente para pagar a fatura.
+        </div>
+      )}
+
+      {cardInfo.charges.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--muted)",
+              marginBottom: 4,
+            }}
+          >
+            Gastos recentes na fatura:
+          </div>
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+              maxHeight: 120,
+              overflow: "auto",
+            }}
+          >
+            {cardInfo.charges.slice(0, 5).map((c) => (
+              <li
+                key={c.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 12,
+                  padding: "4px 0",
+                }}
+              >
+                <span>{c.description}</span>
+                <span>{money(c.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  )}
+</Card>
+
 
 
 
