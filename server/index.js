@@ -46,12 +46,22 @@ function generateToken(user) {
 }
 
 function authMiddleware(req, res, next) {
+  // ⚠️ NUNCA aplicar auth em rotas públicas de autenticação
+  if (
+    req.path.startsWith("/auth/") && // qualquer coisa em /auth/...
+    req.path !== "/auth/me" // se um dia você criar /auth/me protegido
+  ) {
+    return next();
+  }
+
   const auth = req.headers.authorization;
+
   if (!auth || !auth.toLowerCase().startsWith("bearer ")) {
     return res.status(401).json({ error: "Token não informado" });
   }
 
   const token = auth.slice(7);
+
   try {
     const data = jwt.verify(token, process.env.JWT_SECRET);
     req.userId = data.userId;
@@ -60,6 +70,7 @@ function authMiddleware(req, res, next) {
     return res.status(401).json({ error: "Token inválido" });
   }
 }
+
 
 
 
@@ -342,6 +353,58 @@ app.post("/auth/forgot-password", async (req, res) => {
     return res
       .status(500)
       .json({ error: "Erro ao iniciar recuperação de senha" });
+  }
+});
+
+// Redefinir senha com token
+app.post("/auth/reset-password", async (req, res) => {
+  try {
+    const { token, password } = req.body || {};
+
+    if (!token || !password) {
+      return res
+        .status(400)
+        .json({ error: "token e password são obrigatórios" });
+    }
+
+    const reset = await prisma.passwordReset.findUnique({
+      where: { token },
+    });
+
+    const now = new Date();
+
+    if (!reset || reset.usedAt || reset.expiresAt < now) {
+      return res
+        .status(400)
+        .json({ error: "Token inválido ou expirado. Solicite um novo link." });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: reset.userId },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Usuário não encontrado." });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { password: hashed },
+      });
+
+      await tx.passwordReset.update({
+        where: { id: reset.id },
+        data: { usedAt: now },
+      });
+    });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Erro ao redefinir senha:", err);
+    return res.status(500).json({ error: "Erro ao redefinir senha." });
   }
 });
 
@@ -846,55 +909,67 @@ app.get("/auto-debit", async (req, res) => {
   }
 });
 
-// PUT /auto-debit { accountId, active }
+// PUT /auto-debit { accountId, active, dueDay }
 app.put("/auto-debit", async (req, res) => {
   try {
-    const { accountId, active } = req.body || {};
+    const { accountId, active, dueDay } = req.body || {};
+
     if (!accountId || typeof active !== "boolean") {
-      return res.status(400).json({ error: "accountId e active são obrigatórios" });
+      return res
+        .status(400)
+        .json({ error: "accountId e active são obrigatórios" });
+    }
+
+    // normaliza o dia (1–28) ou null
+    let normalizedDueDay;
+    if (typeof dueDay === "number") {
+      if (dueDay < 1 || dueDay > 28) {
+        return res
+          .status(400)
+          .json({ error: "dueDay deve ser um número entre 1 e 28" });
+      }
+      normalizedDueDay = dueDay;      // setar esse valor
+    } else if (dueDay === null) {
+      normalizedDueDay = null;        // limpar o campo
+    } else {
+      normalizedDueDay = undefined;   // não mexer em dueDay
     }
 
     const existing = await prisma.autoDebit.findUnique({
       where: { accountId },
     });
 
-    const wasActive = existing?.active || false;
+    // monta o objeto de dados dinamicamente
+    const dataToSave = { active };
+    if (normalizedDueDay !== undefined) {
+      dataToSave.dueDay = normalizedDueDay;
+    }
 
     let cfg;
     if (existing) {
       cfg = await prisma.autoDebit.update({
         where: { accountId },
-        data: { active },
+        data: dataToSave,
       });
     } else {
       cfg = await prisma.autoDebit.create({
-        data: { accountId, active },
+        data: {
+          accountId,
+          ...dataToSave,
+        },
       });
-    }
-
-    // Se acabou de ativar (false -> true), manda e-mail
-    if (!wasActive && active) {
-      try {
-        const account = await prisma.account.findUnique({
-          where: { id: accountId },
-          include: { user: true },
-        });
-
-        if (account && account.user && account.user.email) {
-          await sendAutoDebitEmail(account.user.email, account.user.name);
-        }
-      } catch (emailErr) {
-        console.error("Erro ao enviar e-mail de débito automático:", emailErr);
-        // Não quebramos a resposta por conta de falha no e-mail
-      }
     }
 
     return res.json(cfg);
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Erro ao salvar débito automático" });
+    console.error("Erro ao salvar débito automático:", err);
+    return res
+      .status(500)
+      .json({ error: "Erro ao salvar débito automático" });
   }
 });
+
+
 
 // ====== START ======
 const port = Number(process.env.PORT || 4000);

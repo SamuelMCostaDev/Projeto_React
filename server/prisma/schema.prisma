@@ -65,6 +65,9 @@ model AutoDebit {
   accountId Int      @unique
 
   active    Boolean  @default(false)
+
+  dueDay    Int?     // dia do mês para rodar o débito automático
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

@@ -12,7 +12,8 @@ import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
-import VerifyEmail from "./pages/VerifyEmail"; // 👈 NOVO
+import VerifyEmail from "./pages/VerifyEmail"; 
+import ResetPassword from "./pages/ResetPassword";
 
 const router = createBrowserRouter([
   {
@@ -24,6 +25,7 @@ const router = createBrowserRouter([
       { path: "/signup", element: <Signup /> },
       { path: "/login", element: <Login /> },
       { path: "/verify-email", element: <VerifyEmail /> }, 
+      { path: "/reset-password", element: <ResetPassword /> },
 
       // rotas protegidas
       {
