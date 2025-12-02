@@ -194,6 +194,17 @@ nav button {
   box-shadow: none;
 }
 
+
+/* depois do bloco genérico de button {} */
+
+.form--narrow button {
+  width: 100%;        /* mesma largura dos inputs */
+  justify-self: stretch;  /* garante que ocupe a coluna inteira do grid */
+  margin-left: 12px;    /* opcional: espaço em relação ao checkbox */
+}
+
+
+
 /* Checkbox alinhado à esquerda */
 .form .checkbox-row{
   display: flex;
