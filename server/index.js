@@ -909,7 +909,6 @@ app.get("/auto-debit", async (req, res) => {
   }
 });
 
-// PUT /auto-debit { accountId, active, dueDay }
 app.put("/auto-debit", async (req, res) => {
   try {
     const { accountId, active, dueDay } = req.body || {};
@@ -920,7 +919,7 @@ app.put("/auto-debit", async (req, res) => {
         .json({ error: "accountId e active são obrigatórios" });
     }
 
-    // normaliza o dia (1–28) ou null
+    // normaliza dia
     let normalizedDueDay;
     if (typeof dueDay === "number") {
       if (dueDay < 1 || dueDay > 28) {
@@ -928,30 +927,35 @@ app.put("/auto-debit", async (req, res) => {
           .status(400)
           .json({ error: "dueDay deve ser um número entre 1 e 28" });
       }
-      normalizedDueDay = dueDay;      // setar esse valor
+      normalizedDueDay = dueDay;
     } else if (dueDay === null) {
-      normalizedDueDay = null;        // limpar o campo
-    } else {
-      normalizedDueDay = undefined;   // não mexer em dueDay
+      normalizedDueDay = null;
     }
 
     const existing = await prisma.autoDebit.findUnique({
       where: { accountId },
     });
 
-    // monta o objeto de dados dinamicamente
+    // montar objeto dinâmico
     const dataToSave = { active };
     if (normalizedDueDay !== undefined) {
       dataToSave.dueDay = normalizedDueDay;
     }
 
+    // ATUALIZA OU CRIA CONFIG
     let cfg;
+    let statusChanged = false;
+
     if (existing) {
+      statusChanged = existing.active !== active;
+
       cfg = await prisma.autoDebit.update({
         where: { accountId },
         data: dataToSave,
       });
     } else {
+      statusChanged = true; // primeira vez sempre muda
+
       cfg = await prisma.autoDebit.create({
         data: {
           accountId,
@@ -960,14 +964,53 @@ app.put("/auto-debit", async (req, res) => {
       });
     }
 
+    // ☑️ BUSCAR DADOS DO USER
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+      include: { user: true },
+    });
+
+    if (!account || !account.user) {
+      console.error("Usuário da conta não encontrado.");
+    }
+
+    // ☑️ ENVIA EMAIL SE O STATUS MUDOU
+    if (statusChanged) {
+      const user = account.user;
+
+      if (active) {
+        await mailer.sendMail({
+          from: process.env.EMAIL_FROM,
+          to: user.email,
+          subject: "Débito automático ativado",
+          html: `
+            <p>Olá, <strong>${user.name}</strong>!</p>
+            <p>O débito automático foi <strong>ativado</strong> com sucesso.</p>
+          `,
+        });
+      } else {
+        await mailer.sendMail({
+          from: process.env.EMAIL_FROM,
+          to: user.email,
+          subject: "Débito automático desativado",
+          html: `
+            <p>Olá, <strong>${user.name}</strong>!</p>
+            <p>O débito automático foi <strong>desativado</strong>.</p>
+          `,
+        });
+      }
+
+      console.log("[auto-debit] Email enviado.");
+    }
+
     return res.json(cfg);
+
   } catch (err) {
     console.error("Erro ao salvar débito automático:", err);
-    return res
-      .status(500)
-      .json({ error: "Erro ao salvar débito automático" });
+    return res.status(500).json({ error: "Erro ao salvar débito automático" });
   }
 });
+
 
 
 
